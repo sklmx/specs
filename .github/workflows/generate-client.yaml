@@ -1,0 +1,53 @@
+name: generate-client
+
+on:
+  push:
+    branches:
+      - test_action
+
+jobs:
+  generate_js_client:
+    runs-on: ubuntu-latest
+    steps:
+      - name: set branch name
+        id: new_branch
+        run: echo ::set-output name=new_branch::$(echo "client_update_$(date +'%Y-%m-%dT%H.%M.%S')")
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          path: specs
+      - name: Checkout js repo
+        uses: actions/checkout@v3
+        with:
+          repository: sklmx/qase-javascript
+          path: qase-javascript
+          token: ${{secrets.JS_REPO_TOKEN}}
+      - name: run js client generation
+        working-directory: ./specs
+        run: ./Taskfile typescript
+      - run: cp -R ./specs/examples/sdk/ts/* ./qase-javascript/qaseio/src
+      - id: git-check
+        working-directory: ./qase-javascript
+        run: echo ::set-output name=modified::$(if [ -n "$(git status --porcelain)" ]; then echo "true"; else echo "false"; fi)
+      - if: steps.git-check.outputs.modified == 'true'
+        working-directory: ./qase-javascript
+        run: |
+         git config --global user.name 'Sergey Skaridov'
+         git config --global user.email 's.skaridov@gmail.com'
+         git checkout -b ${{ steps.new_branch.outputs.new_branch }}
+         git add -A
+         git commit -m '[build] update client'
+         git push --set-upstream origin ${{ steps.new_branch.outputs.new_branch }}
+      - name: create pr
+        id: create_pr
+        uses: octokit/request-action@v2.x
+        with:
+          route: POST /repos/{owner}/{repo}/pulls
+          owner: sklmx
+          repo: qase-javascript
+          base: 'master'
+          head: ${{ steps.new_branch.outputs.new_branch }}
+          title: 'Specs updated'
+          body: 'This PR is auto-generated'
+        env:
+          GITHUB_TOKEN: ${{ secrets.JS_REPO_TOKEN }}

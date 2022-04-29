@@ -68,7 +68,7 @@ function ui() {
 
 openapi() {
   # https://github.com/OpenAPITools/openapi-generator-cli
-  docker run --rm -it \
+  docker run --rm \
     -v "$(pwd)"/api.yaml:/specs/api.yaml \
     -v "$(pwd)"/examples/sdk:/sdk \
     openapitools/openapi-generator-cli:v5.3.1 "${@}"
